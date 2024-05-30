@@ -7,33 +7,44 @@ const sw_scoring = struct {
     pub const gap: i8 = -2;
 };
 
+fn free_table(table: [][]u8, allocator: std.mem.Allocator) void {
+    for (table) |*elem| {
+        allocator.free(elem.*);
+    }
+    allocator.free(table);
+}
+
 pub fn generateTable(word: []const u8, pattern: []const u8, allocator: std.mem.Allocator) !u8 {
     const word_len = word.len;
     const pattern_len = pattern.len;
 
-    var res = std.ArrayList([]u8).init(allocator);
-    for (0..word_len + 1) |_| {
-        try res.append(try allocator.alloc(u8, pattern_len + 1));
+    const res = try allocator.alloc([]u8, word_len + 1);
+    for (res) |*elem| {
+        elem.* = try allocator.alloc(u8, pattern_len + 1);
+        @memset(elem.*, 0);
     }
+    defer free_table(res, allocator);
 
-    var owned_res = try res.toOwnedSlice();
+    debugTable(res, word, pattern);
 
-    for (owned_res, 1..) |row, ri| {
-        for (row, 1..) |_, ci| {
+    for (1..word_len + 1) |ri| {
+        for (1..pattern_len + 1) |ci| {
             var diag_plus: i8 = 0;
             if (word[ri - 1] == pattern[ci - 1]) {
                 // todo calc the field
                 diag_plus = sw_scoring.match;
             }
-            const diag_score = @as(i16, owned_res[ri - 1][ci - 1]) + diag_plus;
-            const up_score = @as(i16, owned_res[ri - 1][ci]) + sw_scoring.gap;
-            const down_score = @as(i16, owned_res[ri][ci - 1]) + sw_scoring.gap;
-            const mismatch_score = @as(i16, owned_res[ri - 1][ci - 1]) + sw_scoring.mismatch;
-            owned_res[ri][ci] = @as(u8, @intCast(@max(@max(@max(diag_score, up_score), down_score), mismatch_score)));
+            const diag_score = @as(i16, res[ri - 1][ci - 1]) + diag_plus;
+            const up_score = @as(i16, res[ri - 1][ci]) + sw_scoring.gap;
+            const down_score = @as(i16, res[ri][ci - 1]) + sw_scoring.gap;
+            const mismatch_score = @as(i16, res[ri - 1][ci - 1]) + sw_scoring.mismatch;
+            res[ri][ci] = @as(u8, @intCast(@max(@max(@max(diag_score, up_score), down_score), mismatch_score)));
         }
     }
+    debugTable(res, word, pattern);
+
     var return_val: u8 = 0;
-    for (owned_res) |row| {
+    for (res) |row| {
         return_val = @max(row[pattern_len], return_val);
     }
 
@@ -41,15 +52,21 @@ pub fn generateTable(word: []const u8, pattern: []const u8, allocator: std.mem.A
 }
 
 pub fn debugTable(table: [][]u8, word: []const u8, pattern: []const u8) void {
+    std.debug.print("      ", .{});
+    for (pattern) |char| {
+        std.debug.print("  {c}", .{char});
+    }
+    std.debug.print("\n", .{});
+
     for (table, 0..) |row, idx| {
-        if (idx == 0) {
-            std.debug.print("{s}\n", .{pattern});
+        if (idx != 0) {
+            std.debug.print(" {c} ", .{word[idx - 1]});
+        } else {
+            std.debug.print("   ", .{});
         }
 
-        std.debug.print("{c}", .{word[idx]});
-
         for (row) |col| {
-            std.debug.print("{d<3} ", .{col});
+            std.debug.print("{d:>3} ", .{col});
         }
         std.debug.print("\n", .{});
     }
