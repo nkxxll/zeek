@@ -14,18 +14,28 @@ fn free_table(table: [][]u8, allocator: std.mem.Allocator) void {
     allocator.free(table);
 }
 
+fn getTableMax(table: [][]u8) u8 {
+    var res: u8 = 0;
+    for (table) |row| {
+        for (row) |col| {
+            if (col > res) {
+                res = col;
+            }
+        }
+    }
+    return res;
+}
+
 pub fn generateTable(word: []const u8, pattern: []const u8, allocator: std.mem.Allocator) !u8 {
     const word_len = word.len;
     const pattern_len = pattern.len;
 
-    const res = try allocator.alloc([]u8, word_len + 1);
-    for (res) |*elem| {
+    const table = try allocator.alloc([]u8, word_len + 1);
+    for (table) |*elem| {
         elem.* = try allocator.alloc(u8, pattern_len + 1);
         @memset(elem.*, 0);
     }
-    defer free_table(res, allocator);
-
-    debugTable(res, word, pattern);
+    defer free_table(table, allocator);
 
     for (1..word_len + 1) |ri| {
         for (1..pattern_len + 1) |ci| {
@@ -33,20 +43,18 @@ pub fn generateTable(word: []const u8, pattern: []const u8, allocator: std.mem.A
             if (word[ri - 1] == pattern[ci - 1]) {
                 // todo calc the field
                 diag_plus = sw_scoring.match;
+            } else {
+                diag_plus = sw_scoring.mismatch;
             }
-            const diag_score = @as(i16, res[ri - 1][ci - 1]) + diag_plus;
-            const up_score = @as(i16, res[ri - 1][ci]) + sw_scoring.gap;
-            const down_score = @as(i16, res[ri][ci - 1]) + sw_scoring.gap;
-            const mismatch_score = @as(i16, res[ri - 1][ci - 1]) + sw_scoring.mismatch;
-            res[ri][ci] = @as(u8, @intCast(@max(@max(@max(diag_score, up_score), down_score), mismatch_score)));
+            const diag_score = @as(i16, table[ri - 1][ci - 1]) + diag_plus;
+            const up_score = @as(i16, table[ri - 1][ci]) + sw_scoring.gap;
+            const down_score = @as(i16, table[ri][ci - 1]) + sw_scoring.gap;
+            table[ri][ci] = @as(u8, @intCast(@max(0, @max(@max(diag_score, up_score), down_score))));
         }
     }
-    debugTable(res, word, pattern);
+    debugTable(table, word, pattern);
 
-    var return_val: u8 = 0;
-    for (res) |row| {
-        return_val = @max(row[pattern_len], return_val);
-    }
+    const return_val = getTableMax(table);
 
     return return_val;
 }
@@ -70,4 +78,37 @@ pub fn debugTable(table: [][]u8, word: []const u8, pattern: []const u8) void {
         }
         std.debug.print("\n", .{});
     }
+}
+
+test "hello" {
+    const word = "hello";
+    const pattern = "hll";
+    const allocator = std.testing.allocator;
+
+    const expect = 10;
+    const res = try generateTable(word, pattern, allocator);
+
+    try std.testing.expectEqual(expect, res);
+}
+
+test "DNA" {
+    const word = "AAATTGGAATTGAGGAA";
+    const pattern = "AATTGGAATTA";
+    const allocator = std.testing.allocator;
+
+    const expect = 42;
+    const res = try generateTable(word, pattern, allocator);
+
+    try std.testing.expectEqual(expect, res);
+}
+
+test "Hella" {
+    const word = "hello";
+    const pattern = "hella";
+    const allocator = std.testing.allocator;
+
+    const expect = 16;
+    const res = try generateTable(word, pattern, allocator);
+
+    try std.testing.expectEqual(expect, res);
 }
