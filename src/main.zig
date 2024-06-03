@@ -1,6 +1,8 @@
 const std = @import("std");
 const sw = @import("./smith_waterman.zig");
 
+pub const log_level: std.log.Level = .warn;
+
 const Line = struct {
     score: u8,
     string: []const u8,
@@ -31,7 +33,9 @@ fn output(input: []const u8, pattern: []const u8, allocator: std.mem.Allocator) 
 
     while (list.next()) |next| {
         const score = try sw.generateTable(next, pattern, allocator);
-        try array_list.append(Line.init(score, next[0..next.len]));
+        if (score > 0) {
+            try array_list.append(Line.init(score, next[0..next.len]));
+        }
     }
 
     const list_slice = try array_list.toOwnedSlice();
@@ -50,7 +54,7 @@ fn printLines(lines: []Line, file: std.fs.File) !void {
     for (lines) |line| {
         // todo: catch string too long
         const string = try line.toString(rank, allocator);
-        try writer.print("{s}", .{string});
+        try writer.print("{s}\n", .{string});
         allocator.free(string);
         rank += 1;
     }
