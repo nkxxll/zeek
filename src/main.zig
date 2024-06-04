@@ -1,7 +1,27 @@
 const std = @import("std");
 const sw = @import("./smith_waterman.zig");
 
-pub const log_level: std.log.Level = .warn;
+pub const std_options: std.Options = .{
+    // Set the log level to info
+    .log_level = .warn,
+
+    .logFn = myLogFn,
+};
+
+/// no fancy format I formatted the output myself
+pub fn myLogFn(
+    comptime level: std.log.Level,
+    comptime scope: @TypeOf(.EnumLiteral),
+    comptime format: []const u8,
+    args: anytype,
+) void {
+    _ = scope;
+    _ = level;
+    std.debug.getStderrMutex().lock();
+    defer std.debug.getStderrMutex().unlock();
+    const stderr = std.io.getStdErr().writer();
+    nosuspend stderr.print(format, args) catch return;
+}
 
 const Line = struct {
     score: u8,
@@ -21,7 +41,7 @@ const Line = struct {
     }
 
     fn toString(self: Line, rank: u8, allocator: std.mem.Allocator) ![]u8 {
-        return try std.fmt.allocPrint(allocator, "{d} {s} {d}", .{ rank, self.string, self.score });
+        return try std.fmt.allocPrint(allocator, "<{d}> {s} ({d})", .{ rank, self.string, self.score });
     }
 };
 
@@ -30,9 +50,10 @@ fn output(input: []const u8, pattern: []const u8, allocator: std.mem.Allocator) 
     var list = std.mem.splitScalar(u8, input, '\n');
     var array_list = std.ArrayList(Line).init(allocator);
     defer array_list.deinit();
+    const seeker = sw.Seeker.init(2, -1, -2);
 
     while (list.next()) |next| {
-        const score = try sw.generateTable(next, pattern, allocator);
+        const score = try seeker.getScore(next, pattern, allocator);
         if (score > 0) {
             try array_list.append(Line.init(score, next[0..next.len]));
         }
@@ -61,22 +82,30 @@ fn printLines(lines: []Line, file: std.fs.File) !void {
 }
 
 pub fn main() !void {
-    const stdin_reader = std.io.getStdIn().reader();
+    const stdin = std.io.getStdIn();
+    const stdin_reader = stdin.reader();
     const stdout = std.io.getStdOut();
     const isTTY = std.io.getStdIn().isTty();
     // todo: learn about when to use which allocator;
     const allocator = std.heap.page_allocator;
-    var buffer: [1024]u8 = undefined;
-    var read_chars: usize = 0;
 
     // catch the error too much input
     if (!isTTY) {
         var args = try std.process.argsWithAllocator(allocator);
         _ = args.skip();
         if (args.next()) |arg| {
-            read_chars = try stdin_reader.readAll(&buffer);
-            const lines = try output(buffer[0..read_chars], arg, allocator);
+            const read_chars = try stdin_reader.readAllAlloc(allocator, 1024 * 1024);
+            defer allocator.free(read_chars);
+            const lines = try output(read_chars, arg, allocator);
+            defer allocator.free(lines);
+            // enter and leave alt screen
+            //_ = try stdout.write("\x1b[?1049h");
+            //_ = try stdout.write("\x1b[?1049l");
             try printLines(lines, stdout);
+            // the stdin is still caught in the initial pipe
+            // const n = try stdin_reader.readInt(u8, .big);
+            // std.debug.assert(n < lines.len);
+            // _ = try stdout.write(lines[n].string);
         }
     } else {
         std.debug.print("This is a TTY we will fix this later", .{});

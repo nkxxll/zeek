@@ -6,6 +6,7 @@ pub fn main() !void {
     const stdout = std.io.getStdOut().writer();
     const isTTY = std.io.getStdIn().isTty();
     var buffer: [1024]u8 = undefined;
+    var buffer2: [1024]u8 = undefined;
     const echo = "echo: ";
     // catch the error too much input
     if (!isTTY) {
@@ -13,8 +14,10 @@ pub fn main() !void {
     } else {
         _ = try stdout.write("please enter a string: ");
         _ = try stdin.readAll(&buffer);
+        _ = try stdout.write("please enter a string: ");
+        _ = try stdin.readUntilDelimiterOrEof(&buffer2, '\n');
     }
-    _ = try stdout.write(echo ++ buffer);
+    _ = try stdout.write(echo ++ buffer ++ buffer2);
 }
 
 fn free_array(array: [][]u8, allocator: std.mem.Allocator) void {
