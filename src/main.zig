@@ -76,7 +76,8 @@ fn printLines(lines: []Line, file: std.fs.File) !void {
     var buffer: [1024]u8 = undefined;
     var buffer_allocator = std.heap.FixedBufferAllocator.init(&buffer);
     const allocator = buffer_allocator.allocator();
-    var rank: u8 = 1;
+    // we are using c like arrays zero index is how it works
+    var rank: u8 = 0;
 
     for (lines) |line| {
         // todo: catch string too long
@@ -111,7 +112,6 @@ fn readUserNumber(lines_nr: usize) !u8 {
 
 pub fn main() !void {
     const stdin = std.io.getStdIn();
-    std.debug.print("{}", .{stdin});
     const stdin_reader = stdin.reader();
     const stdout = std.io.getStdOut();
     const isTTY = std.io.getStdIn().isTty();
@@ -128,13 +128,13 @@ pub fn main() !void {
             const lines = try output(read_chars, arg, allocator);
             defer allocator.free(lines);
             // enter and leave alt screen
-            //_ = try stdout.write("\x1b[?1049h");
-            //_ = try stdout.write("\x1b[?1049l");
+            _ = try stdout.write("\x1b[?1049h");
             try printLines(lines, stdout);
-            // todo handle errors
             if (readUserNumber(lines.len)) |number| {
+                _ = try stdout.write("\x1b[?1049l");
                 _ = try stdout.write(lines[number].string);
             } else |err| {
+                // todo handle errors
                 switch (err) {
                     WrongIndexError.IndexToHigh => {},
                     WrongIndexError.IndexToLow => {},
