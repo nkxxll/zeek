@@ -23,6 +23,12 @@ pub fn myLogFn(
     nosuspend stderr.print(format, args) catch return;
 }
 
+const WrongIndexError = error{
+    IndexToHigh,
+    IndexToLow,
+    NotAnIndex,
+};
+
 const Line = struct {
     score: u8,
     string: []const u8,
@@ -81,8 +87,31 @@ fn printLines(lines: []Line, file: std.fs.File) !void {
     }
 }
 
+fn readUserNumber(lines_nr: usize) !u8 {
+    var res: u8 = 0;
+    const file = "/dev/tty";
+    const fd = try std.fs.openFileAbsolute(file, .{});
+    var input: [10]u8 = undefined;
+
+    const tty_reader = fd.reader();
+    if (try tty_reader.readUntilDelimiterOrEof(&input, '\n')) |in| {
+        res = try std.fmt.parseInt(u8, in, 10);
+    } else {
+        return WrongIndexError.NotAnIndex;
+    }
+
+    if (res >= lines_nr) {
+        return WrongIndexError.IndexToHigh;
+    } else if (res < 0) {
+        return WrongIndexError.IndexToLow;
+    } else {
+        return res;
+    }
+}
+
 pub fn main() !void {
     const stdin = std.io.getStdIn();
+    std.debug.print("{}", .{stdin});
     const stdin_reader = stdin.reader();
     const stdout = std.io.getStdOut();
     const isTTY = std.io.getStdIn().isTty();
@@ -102,10 +131,18 @@ pub fn main() !void {
             //_ = try stdout.write("\x1b[?1049h");
             //_ = try stdout.write("\x1b[?1049l");
             try printLines(lines, stdout);
-            // the stdin is still caught in the initial pipe
-            // const n = try stdin_reader.readInt(u8, .big);
-            // std.debug.assert(n < lines.len);
-            // _ = try stdout.write(lines[n].string);
+            // todo handle errors
+            if (readUserNumber(lines.len)) |number| {
+                _ = try stdout.write(lines[number].string);
+            } else |err| {
+                switch (err) {
+                    WrongIndexError.IndexToHigh => {},
+                    WrongIndexError.IndexToLow => {},
+                    WrongIndexError.NotAnIndex => {},
+                    else => unreachable,
+                }
+            }
+            // the number should allways be less than the list len
         }
     } else {
         std.debug.print("This is a TTY we will fix this later", .{});
