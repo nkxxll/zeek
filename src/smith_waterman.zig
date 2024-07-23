@@ -55,11 +55,10 @@ pub const Seeker = struct {
 
     fn getTableMax(table: [][]u8) u8 {
         var res: u8 = 0;
-        for (table) |row| {
-            for (row) |col| {
-                if (col > res) {
-                    res = col;
-                }
+        const table_len = table.len;
+        for (table[table_len - 1]) |elem| {
+            if (elem > res) {
+                res = elem;
             }
         }
         return res;

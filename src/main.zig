@@ -129,6 +129,8 @@ pub fn main() !void {
             defer allocator.free(lines);
             // enter and leave alt screen
             _ = try stdout.write("\x1b[?1049h");
+            _ = try stdout.write("\x1b[2J");
+            _ = try stdout.write("\x1b[H");
             try printLines(lines, stdout);
             if (readUserNumber(lines.len)) |number| {
                 _ = try stdout.write("\x1b[?1049l");

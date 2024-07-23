@@ -2,6 +2,13 @@
 
 Zeek a fuzzy finder in ZIG.
 
+## todo
+
+- [ ] if "patternzig" is in the mix and "pattern" is the search term it has the same score as "pattern"
+  - this should not be the case I guess
+  - this is because of the max of the hole array not only the last row
+  - have to reevaluate that there
+
 ## Features
 
 ### V0
